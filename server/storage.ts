@@ -29,8 +29,14 @@ export interface IStorage {
   // Orders
   getOrdersByUser(userId: number): Promise<Order[]>;
   getAllOrders(): Promise<Order[]>;
+  deleteOrder(id: number): Promise<void>;
   createOrder(userId: number, order: CreateOrderRequest): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order | undefined>;
+
+  // Users Management
+  getAllUsers(): Promise<User[]>;
+  updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
+  deleteUser(id: number): Promise<void>;
 
   // Wishlist
   getWishlist(userId: number): Promise<Product[]>;
@@ -152,6 +158,10 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(orders).orderBy(desc(orders.createdAt));
   }
 
+  async deleteOrder(id: number): Promise<void> {
+    await db.delete(orders).where(eq(orders.id, id));
+  }
+
   async createOrder(userId: number, order: CreateOrderRequest): Promise<Order> {
     const [newOrder] = await db.insert(orders).values({
       userId,
@@ -166,6 +176,22 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id))
       .returning();
     return updatedOrder;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
+    const [updatedUser] = await db.update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
   }
 
   // Wishlist

@@ -211,6 +211,41 @@ export const api = {
         200: z.any(),
         401: errorSchemas.unauthorized,
       }
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/orders/:id' as const,
+      responses: {
+        204: z.void(),
+        401: errorSchemas.unauthorized,
+      }
+    }
+  },
+  users: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/users' as const,
+      responses: {
+        200: z.array(z.any()),
+        401: errorSchemas.unauthorized,
+      }
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/users/:id' as const,
+      input: insertUserSchema.partial(),
+      responses: {
+        200: z.any(),
+        401: errorSchemas.unauthorized,
+      }
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/users/:id' as const,
+      responses: {
+        204: z.void(),
+        401: errorSchemas.unauthorized,
+      }
     }
   },
   admin: {

@@ -1,17 +1,30 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useAdminStats, useAllOrders } from "@/hooks/use-orders";
+import { useProducts } from "@/hooks/use-products";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Package, ShoppingBag, DollarSign } from "lucide-react";
+import { Users, Package, ShoppingBag, DollarSign, Plus, Edit, Trash2, CheckCircle, Clock, XCircle } from "lucide-react";
 import { formatCurrency } from "@/utils/formatCurrency";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { Product, User, Order } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
 
 export default function AdminPage() {
   const { user, isLoading: userLoading } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: orders } = useAllOrders();
+  const { data: products } = useProducts();
+  const { data: allUsers } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
 
   if (userLoading) return null;
 
@@ -20,12 +33,62 @@ export default function AdminPage() {
     return null;
   }
 
+  const handleDeleteProduct = async (id: number) => {
+    if (!confirm("¿Estás seguro de eliminar este producto?")) return;
+    try {
+      await apiRequest("DELETE", `/api/products/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({ title: "Producto eliminado" });
+    } catch (e) {
+      toast({ title: "Error al eliminar", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteUser = async (id: number) => {
+    if (!confirm("¿Estás seguro de eliminar este usuario?")) return;
+    try {
+      await apiRequest("DELETE", `/api/users/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "Usuario eliminado" });
+    } catch (e) {
+      toast({ title: "Error al eliminar", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteOrder = async (id: number) => {
+    if (!confirm("¿Estás seguro de eliminar este pedido?")) return;
+    try {
+      await apiRequest("DELETE", `/api/orders/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Pedido eliminado" });
+    } catch (e) {
+      toast({ title: "Error al eliminar", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateOrderStatus = async (id: number, status: string) => {
+    try {
+      await apiRequest("PUT", `/api/orders/${id}/status`, { status });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Estado de pedido actualizado" });
+    } catch (e) {
+      toast({ title: "Error al actualizar", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <h1 className="text-3xl font-display font-bold mb-8">Admin Dashboard</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-display font-bold">Admin Dashboard</h1>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href="/admin/products/new"><Plus className="w-4 h-4 mr-2" /> Nuevo Producto</Link>
+            </Button>
+          </div>
+        </div>
         
         {statsLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -72,48 +135,144 @@ export default function AdminPage() {
           </div>
         ) : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted text-muted-foreground">
-                  <tr>
-                    <th className="p-3 rounded-tl-lg">Order ID</th>
-                    <th className="p-3">Date</th>
-                    <th className="p-3">Customer</th>
-                    <th className="p-3">Total</th>
-                    <th className="p-3 rounded-tr-lg">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders?.slice(0, 10).map((order) => (
-                    <tr key={order.id} className="border-b last:border-0">
-                      <td className="p-3 font-medium">#{order.id}</td>
-                      <td className="p-3">{new Date(order.createdAt!).toLocaleDateString()}</td>
-                      <td className="p-3">User #{order.userId}</td>
-                      <td className="p-3 font-bold">{formatCurrency(order.total)}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                          order.status === 'entregado' ? 'bg-green-100 text-green-700' :
-                          order.status === 'enviado' ? 'bg-blue-100 text-blue-700' :
-                          'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {order.status.toUpperCase()}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {(!orders || orders.length === 0) && (
-                    <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No orders found</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="orders" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="orders">Pedidos</TabsTrigger>
+            <TabsTrigger value="products">Productos</TabsTrigger>
+            <TabsTrigger value="users">Usuarios</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="orders">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gestión de Pedidos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-muted text-muted-foreground">
+                      <tr>
+                        <th className="p-3">ID</th>
+                        <th className="p-3">Cliente</th>
+                        <th className="p-3">Total</th>
+                        <th className="p-3">Estado</th>
+                        <th className="p-3">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders?.map((order) => (
+                        <tr key={order.id} className="border-b last:border-0">
+                          <td className="p-3 font-medium">#{order.id}</td>
+                          <td className="p-3">{order.address.fullName}</td>
+                          <td className="p-3 font-bold">{formatCurrency(order.total)}</td>
+                          <td className="p-3">
+                            <select 
+                              value={order.status}
+                              onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
+                              className="text-xs border rounded p-1"
+                            >
+                              <option value="pendiente">Pendiente</option>
+                              <option value="pagado">Pagado</option>
+                              <option value="enviado">Enviado</option>
+                              <option value="entregado">Entregado</option>
+                              <option value="cancelado">Cancelado</option>
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteOrder(order.id)}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="products">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gestión de Productos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-muted text-muted-foreground">
+                      <tr>
+                        <th className="p-3">Nombre</th>
+                        <th className="p-3">Precio</th>
+                        <th className="p-3">Stock</th>
+                        <th className="p-3">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products?.map((product) => (
+                        <tr key={product.id} className="border-b last:border-0">
+                          <td className="p-3 font-medium">{product.name}</td>
+                          <td className="p-3">{formatCurrency(product.price)}</td>
+                          <td className="p-3">{product.stock}</td>
+                          <td className="p-3 flex gap-2">
+                            <Button asChild variant="ghost" size="icon">
+                              <Link href={`/admin/products/edit/${product.id}`}><Edit className="w-4 h-4" /></Link>
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(product.id)}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="users">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gestión de Usuarios</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-muted text-muted-foreground">
+                      <tr>
+                        <th className="p-3">Nombre</th>
+                        <th className="p-3">Email</th>
+                        <th className="p-3">Rol</th>
+                        <th className="p-3">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allUsers?.map((u) => (
+                        <tr key={u.id} className="border-b last:border-0">
+                          <td className="p-3 font-medium">{u.name}</td>
+                          <td className="p-3">{u.email}</td>
+                          <td className="p-3">
+                            <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>
+                              {u.role.toUpperCase()}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            {u.id !== user.id && (
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id)}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
 
       <Footer />

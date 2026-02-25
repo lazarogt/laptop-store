@@ -46,7 +46,7 @@ export const orders = pgTable("orders", {
   items: jsonb("items").$type<{ productId: number; quantity: number; price: string }[]>().notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   address: jsonb("address").$type<{ fullName: string; street: string; city: string; zip: string; country: string }>().notNull(),
-  status: text("status").notNull().default("pendiente"), // pendiente, pagado, enviado, entregado
+  status: text("status").notNull().default("pendiente"), // pendiente, pagado, enviado, entregado, cancelado
   createdAt: timestamp("created_at").defaultNow(),
 });
 

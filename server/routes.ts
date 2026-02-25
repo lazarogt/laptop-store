@@ -278,6 +278,34 @@ export async function registerRoutes(
     res.status(200).json(order);
   });
 
+  app.delete(api.orders.delete.path, requireAdmin, async (req, res) => {
+    await storage.deleteOrder(Number(req.params.id));
+    res.status(204).end();
+  });
+
+  // === USERS ROUTES ===
+  app.get(api.users.list.path, requireAdmin, async (req, res) => {
+    const users = await storage.getAllUsers();
+    res.status(200).json(users.map(({ password, ...u }) => u));
+  });
+
+  app.put(api.users.update.path, requireAdmin, async (req, res) => {
+    try {
+      const input = api.users.update.input.parse(req.body);
+      const updated = await storage.updateUser(Number(req.params.id), input);
+      if (!updated) return res.status(404).json({ message: "Usuario no encontrado" });
+      const { password, ...userWithoutPassword } = updated;
+      res.status(200).json(userWithoutPassword);
+    } catch (err) {
+      res.status(400).json({ message: "Datos inválidos" });
+    }
+  });
+
+  app.delete(api.users.delete.path, requireAdmin, async (req, res) => {
+    await storage.deleteUser(Number(req.params.id));
+    res.status(204).end();
+  });
+
   // === ADMIN ROUTES ===
   app.get(api.admin.stats.path, requireAdmin, async (req, res) => {
     const stats = await storage.getStats();
