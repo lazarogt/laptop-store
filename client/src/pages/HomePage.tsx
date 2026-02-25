@@ -6,6 +6,7 @@ import { ProductCard } from "@/components/product/ProductCard";
 import { useProducts } from "@/hooks/use-products";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 
 export default function HomePage() {
   const { data: products, isLoading } = useProducts({ sort: "rating" });
