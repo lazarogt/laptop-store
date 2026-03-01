@@ -1,4 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -6,21 +9,55 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
-declare module "http" {
-  interface IncomingMessage {
-    rawBody: unknown;
-  }
+const PORT = parseInt(process.env.PORT ?? "5000", 10);
+const CLIENT_URL = process.env.CLIENT_URL ?? "http://localhost:5173";
+const NODE_ENV = process.env.NODE_ENV ?? "development";
+const TRUST_PROXY = process.env.TRUST_PROXY ?? (NODE_ENV === "production" ? "1" : "0");
+const LOG_API_RESPONSE_BODIES = NODE_ENV !== "production" && process.env.LOG_API_RESPONSE_BODIES === "true";
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+      },
+    },
+  }),
+);
+app.use(compression());
+
+if (TRUST_PROXY === "1" || TRUST_PROXY.toLowerCase() === "true") {
+  app.set("trust proxy", 1);
 }
+
+const allowed = process.env.CLIENT_URL ?? "http://localhost:5173";
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (
+        origin === allowed ||
+        origin.endsWith(".netlify.app") ||
+        origin.endsWith(".railway.app")
+      ) {
+        return cb(null, true);
+      }
+      return cb(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  }),
+);
+app.options("/*", cors());
 
 app.use(
   express.json({
     verify: (req, _res, buf) => {
-      req.rawBody = buf;
+      (req as Request & { rawBody?: unknown }).rawBody = buf;
     },
+    limit: "5mb",
   }),
 );
-
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: "5mb" }));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -29,7 +66,6 @@ export function log(message: string, source = "express") {
     second: "2-digit",
     hour12: true,
   });
-
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
@@ -37,21 +73,29 @@ app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  if (LOG_API_RESPONSE_BODIES) {
+    const originalResJson = res.json.bind(res);
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+    (res as Response & { json: (body?: unknown) => Response }).json = function (bodyJson?: unknown) {
+      try {
+        capturedJsonResponse = typeof bodyJson === "object" && bodyJson !== null ? (bodyJson as Record<string, any>) : { data: bodyJson };
+      } catch {
+        capturedJsonResponse = { info: "unserializable response" };
+      }
+      return originalResJson(bodyJson);
+    };
+  }
 
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      if (LOG_API_RESPONSE_BODIES && capturedJsonResponse) {
+        try {
+          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        } catch {
+        }
       }
-
       log(logLine);
     }
   });
@@ -65,39 +109,28 @@ app.use((req, res, next) => {
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
     console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
-    }
-
+    if (res.headersSent) return next(err);
     return res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
+  if (NODE_ENV === "production") {
     serveStatic(app);
   } else {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
-      port,
+      port: PORT,
       host: "0.0.0.0",
       reusePort: true,
     },
     () => {
-      log(`serving on port ${port}`);
+      log(`serving on port ${PORT}`);
+      log(`CLIENT_URL = ${CLIENT_URL}`);
+      log(`NODE_ENV = ${NODE_ENV}`);
     },
   );
 })();
