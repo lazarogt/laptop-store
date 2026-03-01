@@ -1,76 +1,73 @@
-import { useState, useEffect } from "react";
-import { Header } from "@/components/common/Header";
-import { Footer } from "@/components/common/Footer";
-import { ProductCard } from "@/components/product/ProductCard";
-import { useProducts } from "@/hooks/use-products";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from "react";
+import { SlidersHorizontal } from "lucide-react";
 import { useLocation } from "wouter";
+import { Layout } from "@/components/premium/Layout";
+import { ProductGrid } from "@/components/premium/ProductGrid";
+import { useProducts } from "@/hooks/use-products";
+import { formatCategoryLabel, getProductCategoriesForStorefront, normalizeCategorySlug } from "@/utils/displayLabels";
 
 export default function SearchPage() {
   const [location] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
-  const q = searchParams.get('q') || '';
-  const category = location.startsWith('/category/') ? location.split('/').pop() : '';
+  const query = searchParams.get("q") || "";
+  const rawCategory = location.startsWith("/category/") ? location.split("/").pop() : "";
+  const category = normalizeCategorySlug(rawCategory) ?? "";
+  const isDealsPage = location === "/deals";
+  const categoryLabel = formatCategoryLabel(category);
+  const mappedCategories = getProductCategoriesForStorefront(category);
 
   const [sort, setSort] = useState("rating");
-  
   const queryParams: Record<string, string> = { sort };
-  if (q) queryParams.search = q;
-  if (category && category !== 'search') queryParams.category = category;
+
+  if (query) queryParams.search = query;
 
   const { data: products, isLoading } = useProducts(queryParams);
+  const visibleProducts = (products ?? []).filter((product) => {
+    if (isDealsPage) {
+      return product.badges?.some((badge) => badge.toLowerCase().includes("oferta"));
+    }
+    if (!category) return true;
+    return mappedCategories.includes(product.category);
+  });
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Header />
-      
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+    <Layout>
+      <section className="mx-auto w-full max-w-[1280px] px-4 py-10 md:px-6">
+        <div className="mb-8 flex flex-col justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:flex-row md:items-end">
           <div>
-            <h1 className="text-2xl font-display font-bold capitalize">
-              {q ? `Search results for "${q}"` : category ? `${category} Laptops` : 'All Laptops'}
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+              {query
+                ? `Resultados para "${query}"`
+                : isDealsPage
+                  ? "Ofertas destacadas"
+                  : categoryLabel
+                    ? `Laptops ${categoryLabel}`
+                    : "Todas las laptops"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {products?.length || 0} items found
-            </p>
+            <p className="mt-1 text-sm text-slate-500">{visibleProducts.length} productos encontrados</p>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium whitespace-nowrap">Sort by:</label>
-            <select 
-              className="border rounded-lg p-2 bg-card text-sm focus:outline-none focus:border-accent"
+
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+            <label htmlFor="sort-products" className="text-sm font-medium text-slate-600">
+              Ordenar por
+            </label>
+            <select
+              id="sort-products"
+              className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-slate-300"
               value={sort}
-              onChange={(e) => setSort(e.target.value)}
+              onChange={(event) => setSort(event.target.value)}
             >
-              <option value="rating">Top Rated</option>
-              <option value="price_asc">Price: Low to High</option>
-              <option value="price_desc">Price: High to Low</option>
-              <option value="newest">Newest Arrivals</option>
+              <option value="rating">Mejor valorados</option>
+              <option value="price_asc">Precio: menor a mayor</option>
+              <option value="price_desc">Precio: mayor a menor</option>
+              <option value="newest">Más recientes</option>
             </select>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {isLoading ? (
-            Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="space-y-4 bg-card p-4 rounded-xl border">
-                <Skeleton className="w-full aspect-video rounded-lg" />
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-8 w-1/3" />
-              </div>
-            ))
-          ) : products && products.length > 0 ? (
-            products.map(product => <ProductCard key={product.id} product={product} />)
-          ) : (
-            <div className="col-span-full py-24 text-center">
-              <h2 className="text-xl font-bold mb-2">No products found</h2>
-              <p className="text-muted-foreground">Try adjusting your search or filters.</p>
-            </div>
-          )}
-        </div>
-      </main>
-
-      <Footer />
-    </div>
+        <ProductGrid products={visibleProducts} isLoading={isLoading} skeletonCount={8} />
+      </section>
+    </Layout>
   );
 }

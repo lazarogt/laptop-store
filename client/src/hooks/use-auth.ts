@@ -14,7 +14,7 @@ export function useAuth() {
     queryFn: async () => {
       const res = await fetch(api.auth.me.path, { credentials: "include" });
       if (res.status === 401) return null;
-      if (!res.ok) throw new Error("Failed to fetch user");
+      if (!res.ok) throw new Error("No se pudo cargar el usuario");
       return res.json();
     },
     retry: false,
@@ -30,17 +30,17 @@ export function useAuth() {
       });
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || "Login failed");
+        throw new Error(error.message || "Error al iniciar sesión");
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
-      toast({ title: "Welcome back!", description: "Successfully logged in." });
+      toast({ title: "¡Bienvenido de nuevo!", description: "Sesión iniciada correctamente." });
       setLocation("/");
     },
     onError: (error: Error) => {
-      toast({ title: "Login Failed", description: error.message, variant: "destructive" });
+      toast({ title: "Error al iniciar sesión", description: error.message, variant: "destructive" });
     }
   });
 
@@ -54,17 +54,17 @@ export function useAuth() {
       });
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || "Registration failed");
+        throw new Error(error.message || "Error al registrarse");
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
-      toast({ title: "Account created!", description: "Welcome to LaptopStore." });
+      toast({ title: "¡Cuenta creada!", description: "Bienvenido a LaptopStore." });
       setLocation("/");
     },
     onError: (error: Error) => {
-      toast({ title: "Registration Failed", description: error.message, variant: "destructive" });
+      toast({ title: "Error de registro", description: error.message, variant: "destructive" });
     }
   });
 
@@ -74,7 +74,7 @@ export function useAuth() {
     },
     onSuccess: () => {
       queryClient.setQueryData([api.auth.me.path], null);
-      toast({ title: "Logged out", description: "You have been successfully logged out." });
+      toast({ title: "Sesión cerrada", description: "Has cerrado sesión correctamente." });
       setLocation("/");
     }
   });

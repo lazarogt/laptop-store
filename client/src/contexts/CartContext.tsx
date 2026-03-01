@@ -46,8 +46,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return [...prev, { ...product, cartQuantity: quantity }];
     });
     toast({
-      title: "Added to Cart",
-      description: `${product.name} has been added to your cart.`,
+      title: "Añadido al carrito",
+      description: `${product.name} se añadió a tu carrito.`,
     });
   };
 
@@ -84,6 +84,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
 export function useCart() {
   const context = useContext(CartContext);
-  if (!context) throw new Error("useCart must be used within CartProvider");
+  if (!context) throw new Error("useCart debe usarse dentro de CartProvider");
   return context;
 }

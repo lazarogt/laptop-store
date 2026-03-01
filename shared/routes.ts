@@ -29,7 +29,7 @@ export const api = {
       path: '/api/auth/login' as const,
       input: loginSchema,
       responses: {
-        200: z.any(), // user object
+        200: z.any(),
         401: errorSchemas.unauthorized,
       }
     },
@@ -63,14 +63,14 @@ export const api = {
       method: 'GET' as const,
       path: '/api/products' as const,
       responses: {
-        200: z.array(z.any()), // list of products
+        200: z.array(z.any()),
       }
     },
     get: {
       method: 'GET' as const,
       path: '/api/products/:slug' as const,
       responses: {
-        200: z.any(), // product detail with reviews
+        200: z.any(),
         404: errorSchemas.notFound,
       }
     },
@@ -137,7 +137,7 @@ export const api = {
     },
     update: {
       method: 'PUT' as const,
-      path: '/api/cart/items/:id' as const, // id is productId
+      path: '/api/cart/items/:id' as const,
       input: z.object({ quantity: z.number().min(1) }),
       responses: {
         200: z.array(z.any())
@@ -156,7 +156,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/wishlist' as const,
       responses: {
-        200: z.array(z.any()) // products
+        200: z.array(z.any())
       }
     },
     add: {
@@ -170,7 +170,7 @@ export const api = {
     },
     delete: {
       method: 'DELETE' as const,
-      path: '/api/wishlist/items/:id' as const, // id is productId
+      path: '/api/wishlist/items/:id' as const,
       responses: {
         204: z.void(),
         401: errorSchemas.unauthorized,
@@ -217,6 +217,20 @@ export const api = {
       path: '/api/orders/:id' as const,
       responses: {
         204: z.void(),
+        401: errorSchemas.unauthorized,
+      }
+    }
+  },
+  telegram: {
+    status: {
+      method: 'GET' as const,
+      path: '/api/telegram/status' as const,
+      responses: {
+        200: z.object({
+          connected: z.boolean(),
+          connectUrl: z.string().nullable(),
+          botUsername: z.string().nullable(),
+        }),
         401: errorSchemas.unauthorized,
       }
     }

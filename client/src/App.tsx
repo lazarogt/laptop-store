@@ -16,6 +16,9 @@ import AuthPage from "./pages/AuthPage";
 import AdminPage from "./pages/AdminPage";
 import WishlistPage from "./pages/WishlistPage";
 import NotFound from "@/pages/not-found";
+import AddProduct from "./pages/AddProduct";
+import MyOrders from "./pages/MyOrders";
+
 
 function Router() {
   return (
@@ -30,6 +33,8 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/wishlist" component={WishlistPage} />
+      <Route path="/admin/add-product" component={AddProduct} />
+      <Route path="/my-orders" component={MyOrders}/>
       <Route component={NotFound} />
     </Switch>
   );

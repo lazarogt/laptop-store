@@ -17,15 +17,15 @@ export default function CartPage() {
       <Header />
       
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <h1 className="text-3xl font-display font-bold mb-8">Shopping Cart</h1>
+        <h1 className="text-3xl font-display font-bold mb-8">Carrito de compras</h1>
         
         {cart.length === 0 ? (
           <div className="text-center py-24 bg-card rounded-2xl border border-border shadow-sm">
             <ShoppingCart className="w-20 h-20 text-muted-foreground/30 mx-auto mb-6" />
-            <h2 className="text-2xl font-bold mb-4">Your cart is empty</h2>
-            <p className="text-muted-foreground mb-8">Looks like you haven't added any laptops to your cart yet.</p>
+            <h2 className="text-2xl font-bold mb-4">Tu carrito está vacío</h2>
+            <p className="text-muted-foreground mb-8">Parece que aún no has agregado laptops al carrito.</p>
             <Button asChild size="lg" className="bg-accent text-primary hover:bg-accent/90 font-bold px-8">
-              <Link href="/">Continue Shopping</Link>
+              <Link href="/">Seguir comprando</Link>
             </Button>
           </div>
         ) : (
@@ -33,8 +33,8 @@ export default function CartPage() {
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-card rounded-2xl border p-6 shadow-sm">
                 <div className="hidden sm:grid grid-cols-12 text-sm font-bold text-muted-foreground mb-4 pb-4 border-b">
-                  <div className="col-span-6">Product</div>
-                  <div className="col-span-3 text-center">Quantity</div>
+                  <div className="col-span-6">Producto</div>
+                  <div className="col-span-3 text-center">Cantidad</div>
                   <div className="col-span-3 text-right">Subtotal</div>
                 </div>
                 
@@ -54,13 +54,13 @@ export default function CartPage() {
                             onClick={() => removeFromCart(item.id)}
                             className="text-sm text-destructive hover:underline mt-2 flex items-center gap-1"
                           >
-                            <Trash2 className="w-3 h-3" /> Remove
+                            <Trash2 className="w-3 h-3" /> Eliminar
                           </button>
                         </div>
                       </div>
                       
                       <div className="col-span-1 sm:col-span-3 flex justify-between sm:justify-center items-center">
-                        <span className="sm:hidden font-medium text-sm">Qty:</span>
+                        <span className="sm:hidden font-medium text-sm">Cant.:</span>
                         <select
                           className="border rounded-lg p-2 bg-background w-20 text-center focus:border-accent focus:outline-none"
                           value={item.cartQuantity}
@@ -84,16 +84,16 @@ export default function CartPage() {
             
             <div className="lg:col-span-1">
               <div className="bg-card rounded-2xl border p-6 shadow-xl shadow-black/5 sticky top-24">
-                <h2 className="text-xl font-display font-bold mb-6">Order Summary</h2>
+                <h2 className="text-xl font-display font-bold mb-6">Resumen del pedido</h2>
                 
                 <div className="space-y-4 mb-6 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Items ({cart.length}):</span>
+                    <span className="text-muted-foreground">Productos ({cart.length}):</span>
                     <span className="font-medium">{formatCurrency(cartTotal)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Shipping:</span>
-                    <span className="font-medium">{shipping === 0 ? <span className="text-green-600">Free</span> : formatCurrency(shipping)}</span>
+                    <span className="text-muted-foreground">Envío:</span>
+                    <span className="font-medium">{shipping === 0 ? <span className="text-green-600">Gratis</span> : formatCurrency(shipping)}</span>
                   </div>
                   <div className="border-t pt-4 flex justify-between items-center">
                     <span className="font-bold text-base">Total:</span>
@@ -102,11 +102,11 @@ export default function CartPage() {
                 </div>
                 
                 <Button asChild className="w-full bg-accent hover:bg-accent/90 text-primary font-bold py-6 text-lg rounded-xl shadow-lg transition-all hover:-translate-y-0.5 mb-4">
-                  <Link href="/checkout">Proceed to Checkout</Link>
+                  <Link href="/checkout">Ir al pago</Link>
                 </Button>
                 
                 <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                  <ShieldCheck className="w-4 h-4 text-green-500" /> Safe and secure checkout
+                  <ShieldCheck className="w-4 h-4 text-green-500" /> Pago seguro y protegido
                 </div>
               </div>
             </div>

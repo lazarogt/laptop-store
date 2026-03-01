@@ -8,18 +8,23 @@ import { Footer } from "@/components/common/Footer";
 import { useCart } from "@/contexts/CartContext";
 import { useCreateOrder } from "@/hooks/use-orders";
 import { useAuth } from "@/hooks/use-auth";
+import { useTelegramStatus } from "@/hooks/use-telegram";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/utils/formatCurrency";
-import { CheckCircle2, Lock } from "lucide-react";
+import { CheckCircle2, ExternalLink, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const addressSchema = z.object({
-  fullName: z.string().min(3, "Full name is required"),
-  street: z.string().min(5, "Street address is required"),
-  city: z.string().min(2, "City is required"),
-  zip: z.string().min(4, "ZIP code is required"),
-  country: z.string().min(2, "Country is required"),
+  fullName: z.string().min(3, "El nombre completo es obligatorio"),
+  street: z.string().min(5, "La dirección es obligatoria"),
+  city: z.string().min(2, "La ciudad es obligatoria"),
+  zip: z.string().min(4, "El código postal es obligatorio"),
+  country: z.string().min(2, "El país es obligatorio"),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\+?[1-9]\d{7,14}$/, "Usa formato internacional, por ejemplo +15551234567"),
 });
 
 type AddressForm = z.infer<typeof addressSchema>;
@@ -28,6 +33,12 @@ export default function CheckoutPage() {
   const { cart, cartTotal, clearCart } = useCart();
   const { user } = useAuth();
   const createOrder = useCreateOrder();
+  const {
+    data: telegramStatus,
+    refetch: refreshTelegramStatus,
+    isFetching: isRefreshingTelegramStatus,
+    isLoading: isLoadingTelegramStatus,
+  } = useTelegramStatus(Boolean(user));
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isSuccess, setIsSuccess] = useState(false);
@@ -42,14 +53,24 @@ export default function CheckoutPage() {
       street: "",
       city: "",
       zip: "",
-      country: "US",
+      country: "",
+      phone: "",
     }
   });
 
   const onSubmit = (data: AddressForm) => {
     if (!user) {
-      toast({ title: "Sign in required", description: "Please sign in to place an order.", variant: "destructive" });
+      toast({ title: "Inicio de sesión requerido", description: "Inicia sesión para completar tu pedido.", variant: "destructive" });
       setLocation("/auth");
+      return;
+    }
+
+    if (!telegramStatus?.connected) {
+      toast({
+        title: "Conecta Telegram antes de confirmar",
+        description: "Abre el enlace de Telegram y pulsa Iniciar para recibir notificaciones del pedido.",
+        variant: "destructive",
+      });
       return;
     }
     
@@ -78,11 +99,11 @@ export default function CheckoutPage() {
         <Header />
         <div className="flex-1 flex flex-col items-center justify-center p-4">
           <CheckCircle2 className="w-24 h-24 text-green-500 mb-6" />
-          <h1 className="text-4xl font-display font-bold mb-4 text-center">Order Confirmed!</h1>
+          <h1 className="text-4xl font-display font-bold mb-4 text-center">¡Pedido confirmado!</h1>
           <p className="text-lg text-muted-foreground mb-8 text-center max-w-md">
-            Thank you for shopping at LaptopStore. We've received your simulated order and will "ship" it soon.
+            Gracias por comprar en LaptopStore. Recibimos tu pedido y lo procesaremos pronto.
           </p>
-          <Button asChild size="lg" className="bg-primary text-white"><Link href="/orders">View My Orders</Link></Button>
+          <Button asChild size="lg" className="bg-primary text-white"><Link href="/my-orders">Ver mis pedidos</Link></Button>
         </div>
         <Footer />
       </div>
@@ -100,52 +121,100 @@ export default function CheckoutPage() {
       
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <h1 className="text-3xl font-display font-bold mb-8 flex items-center gap-3">
-          Checkout <Lock className="w-5 h-5 text-green-600" />
+          Finalizar compra <Lock className="w-5 h-5 text-green-600" />
         </h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8">
             <form id="checkout-form" onSubmit={form.handleSubmit(onSubmit)} className="bg-card border rounded-2xl p-6 shadow-sm mb-6">
-              <h2 className="text-xl font-bold mb-6 pb-4 border-b">Shipping Address</h2>
+              <h2 className="text-xl font-bold mb-6 pb-4 border-b">Dirección de envío</h2>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Full Name</label>
+                  <label className="block text-sm font-medium mb-1">Nombre completo</label>
                   <Input {...form.register("fullName")} className={form.formState.errors.fullName ? "border-destructive" : ""} />
                   {form.formState.errors.fullName && <p className="text-xs text-destructive mt-1">{form.formState.errors.fullName.message}</p>}
                 </div>
                 
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Street Address</label>
+                  <label className="block text-sm font-medium mb-1">Dirección</label>
                   <Input {...form.register("street")} className={form.formState.errors.street ? "border-destructive" : ""} />
                   {form.formState.errors.street && <p className="text-xs text-destructive mt-1">{form.formState.errors.street.message}</p>}
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">City</label>
+                  <label className="block text-sm font-medium mb-1">Ciudad</label>
                   <Input {...form.register("city")} className={form.formState.errors.city ? "border-destructive" : ""} />
                   {form.formState.errors.city && <p className="text-xs text-destructive mt-1">{form.formState.errors.city.message}</p>}
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">ZIP / Postal Code</label>
+                  <label className="block text-sm font-medium mb-1">Código postal</label>
                   <Input {...form.register("zip")} className={form.formState.errors.zip ? "border-destructive" : ""} />
                   {form.formState.errors.zip && <p className="text-xs text-destructive mt-1">{form.formState.errors.zip.message}</p>}
                 </div>
                 
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Country</label>
+                  <label className="block text-sm font-medium mb-1">País</label>
                   <Input {...form.register("country")} className={form.formState.errors.country ? "border-destructive" : ""} />
                   {form.formState.errors.country && <p className="text-xs text-destructive mt-1">{form.formState.errors.country.message}</p>}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Teléfono</label>
+                  <Input {...form.register("phone")} placeholder="+15551234567" className={form.formState.errors.phone ? "border-destructive" : ""} />
+                  {form.formState.errors.phone && <p className="text-xs text-destructive mt-1">{form.formState.errors.phone.message}</p>}
+                  <p className="text-xs text-muted-foreground mt-1">Incluye código de país (formato E.164). Usaremos este número para notificaciones del pedido.</p>
+                </div>
+
+                <div className="sm:col-span-2 border rounded-lg p-4 bg-slate-50">
+                  <p className="text-sm font-semibold mb-1">Notificaciones por Telegram</p>
+                  {isLoadingTelegramStatus ? (
+                    <p className="text-xs text-muted-foreground">Verificando estado de Telegram...</p>
+                  ) : telegramStatus?.connected ? (
+                    <p className="text-xs text-green-700">Telegram conectado. Recibirás confirmaciones del pedido en tu cuenta.</p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Conecta tu Telegram para recibir confirmaciones. Abre el enlace, pulsa Iniciar en el bot y vuelve aquí.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {telegramStatus?.connectUrl ? (
+                          <Button type="button" size="sm" asChild className="gap-2">
+                            <a href={telegramStatus.connectUrl} target="_blank" rel="noreferrer">
+                              Conectar Telegram
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button type="button" size="sm" disabled>
+                            Configuración de Telegram incompleta
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => refreshTelegramStatus()}
+                          disabled={isRefreshingTelegramStatus}
+                        >
+                          {isRefreshingTelegramStatus ? "Verificando..." : "Ya me conecté"}
+                        </Button>
+                      </div>
+                      {telegramStatus?.botUsername ? (
+                        <p className="text-xs text-muted-foreground mt-2">Bot: @{telegramStatus.botUsername}</p>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               </div>
             </form>
             
             <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h2 className="text-xl font-bold mb-6 pb-4 border-b">Payment Method (Simulated)</h2>
+              <h2 className="text-xl font-bold mb-6 pb-4 border-b">Método de pago (simulado)</h2>
               <div className="p-4 bg-muted rounded-lg border flex items-center justify-center h-24">
                 <p className="text-muted-foreground font-medium flex items-center gap-2">
-                  <Lock className="w-4 h-4" /> Payment is bypassed in this demo.
+                  <Lock className="w-4 h-4" /> El pago se omite en esta demo.
                 </p>
               </div>
             </div>
@@ -153,7 +222,7 @@ export default function CheckoutPage() {
           
           <div className="lg:col-span-4">
             <div className="bg-card border rounded-2xl p-6 shadow-lg sticky top-24">
-              <h2 className="text-xl font-bold mb-4">Order Summary</h2>
+              <h2 className="text-xl font-bold mb-4">Resumen del pedido</h2>
               
               <div className="space-y-4 mb-6 max-h-64 overflow-y-auto pr-2">
                 {cart.map(item => (
@@ -161,7 +230,7 @@ export default function CheckoutPage() {
                     <img src={item.images[0] || ""} className="w-12 h-12 object-contain border rounded bg-white" />
                     <div className="flex-1 text-sm">
                       <p className="font-medium line-clamp-1">{item.name}</p>
-                      <p className="text-muted-foreground">Qty: {item.cartQuantity}</p>
+                      <p className="text-muted-foreground">Cant.: {item.cartQuantity}</p>
                     </div>
                     <div className="font-bold text-sm">
                       {formatCurrency(parseFloat(item.price as string) * item.cartQuantity)}
@@ -176,8 +245,8 @@ export default function CheckoutPage() {
                   <span>{formatCurrency(cartTotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Shipping</span>
-                  <span>{shipping === 0 ? 'Free' : formatCurrency(shipping)}</span>
+                  <span className="text-muted-foreground">Envío</span>
+                  <span>{shipping === 0 ? 'Gratis' : formatCurrency(shipping)}</span>
                 </div>
                 <div className="border-t pt-3 flex justify-between items-center">
                   <span className="font-bold text-base">Total</span>
@@ -188,10 +257,10 @@ export default function CheckoutPage() {
               <Button 
                 type="submit" 
                 form="checkout-form"
-                disabled={createOrder.isPending}
+                disabled={createOrder.isPending || !telegramStatus?.connected}
                 className="w-full bg-accent hover:bg-accent/90 text-primary font-bold py-6 text-lg rounded-xl shadow-md transition-transform active:scale-95"
               >
-                {createOrder.isPending ? "Processing..." : "Place Order"}
+                {createOrder.isPending ? "Procesando..." : "Confirmar pedido"}
               </Button>
             </div>
           </div>

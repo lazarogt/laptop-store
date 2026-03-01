@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import { api } from "@shared/routes";
 import { Product, User, Order } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 
@@ -23,7 +24,7 @@ export default function AdminPage() {
   const { data: orders } = useAllOrders();
   const { data: products } = useProducts();
   const { data: allUsers } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+    queryKey: [api.users.list.path],
   });
 
   if (userLoading) return null;
@@ -37,7 +38,10 @@ export default function AdminPage() {
     if (!confirm("¿Estás seguro de eliminar este producto?")) return;
     try {
       await apiRequest("DELETE", `/api/products/${id}`);
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [api.products.list.path] }),
+        queryClient.invalidateQueries({ queryKey: [api.admin.stats.path] }),
+      ]);
       toast({ title: "Producto eliminado" });
     } catch (e) {
       toast({ title: "Error al eliminar", variant: "destructive" });
@@ -48,7 +52,10 @@ export default function AdminPage() {
     if (!confirm("¿Estás seguro de eliminar este usuario?")) return;
     try {
       await apiRequest("DELETE", `/api/users/${id}`);
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [api.users.list.path] }),
+        queryClient.invalidateQueries({ queryKey: [api.admin.stats.path] }),
+      ]);
       toast({ title: "Usuario eliminado" });
     } catch (e) {
       toast({ title: "Error al eliminar", variant: "destructive" });
@@ -59,7 +66,10 @@ export default function AdminPage() {
     if (!confirm("¿Estás seguro de eliminar este pedido?")) return;
     try {
       await apiRequest("DELETE", `/api/orders/${id}`);
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [api.orders.listAll.path] }),
+        queryClient.invalidateQueries({ queryKey: [api.admin.stats.path] }),
+      ]);
       toast({ title: "Pedido eliminado" });
     } catch (e) {
       toast({ title: "Error al eliminar", variant: "destructive" });
@@ -69,7 +79,10 @@ export default function AdminPage() {
   const handleUpdateOrderStatus = async (id: number, status: string) => {
     try {
       await apiRequest("PUT", `/api/orders/${id}/status`, { status });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [api.orders.listAll.path] }),
+        queryClient.invalidateQueries({ queryKey: [api.admin.stats.path] }),
+      ]);
       toast({ title: "Estado de pedido actualizado" });
     } catch (e) {
       toast({ title: "Error al actualizar", variant: "destructive" });
@@ -82,10 +95,10 @@ export default function AdminPage() {
       
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-display font-bold">Admin Dashboard</h1>
+          <h1 className="text-3xl font-display font-bold">Panel de administración</h1>
           <div className="flex gap-2">
             <Button asChild variant="outline">
-              <Link href="/admin/products/new"><Plus className="w-4 h-4 mr-2" /> Nuevo Producto</Link>
+              <Link href="/admin/add-product"><Plus className="w-4 h-4 mr-2" /> Nuevo producto</Link>
             </Button>
           </div>
         </div>
@@ -98,7 +111,7 @@ export default function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                <CardTitle className="text-sm font-medium">Ingresos totales</CardTitle>
                 <DollarSign className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -107,7 +120,7 @@ export default function AdminPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Orders</CardTitle>
+                <CardTitle className="text-sm font-medium">Pedidos</CardTitle>
                 <ShoppingBag className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -116,7 +129,7 @@ export default function AdminPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Products</CardTitle>
+                <CardTitle className="text-sm font-medium">Productos</CardTitle>
                 <Package className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -125,7 +138,7 @@ export default function AdminPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Users</CardTitle>
+                <CardTitle className="text-sm font-medium">Usuarios</CardTitle>
                 <Users className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -242,7 +255,7 @@ export default function AdminPage() {
                     <thead className="bg-muted text-muted-foreground">
                       <tr>
                         <th className="p-3">Nombre</th>
-                        <th className="p-3">Email</th>
+                        <th className="p-3">Correo</th>
                         <th className="p-3">Rol</th>
                         <th className="p-3">Acciones</th>
                       </tr>

@@ -7,11 +7,10 @@ import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PackageSearch } from "lucide-react";
+import { AlertCircle, PackageSearch } from "lucide-react";
 
-// Register schema extends login with name
 const registerSchema = loginSchema.extend({
-  name: z.string().min(2, "Name must be at least 2 characters"),
+  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -41,52 +40,64 @@ export default function AuthPage() {
             className={`flex-1 py-4 font-bold text-sm ${isLogin ? 'text-primary border-b-2 border-accent bg-white' : 'text-muted-foreground bg-gray-50 hover:bg-gray-100'}`}
             onClick={() => setIsLogin(true)}
           >
-            Sign In
+            Iniciar sesión
           </button>
           <button 
             className={`flex-1 py-4 font-bold text-sm ${!isLogin ? 'text-primary border-b-2 border-accent bg-white' : 'text-muted-foreground bg-gray-50 hover:bg-gray-100'}`}
             onClick={() => setIsLogin(false)}
           >
-            Create Account
+            Crear cuenta
           </button>
         </div>
 
         <div className="p-8">
           {isLogin ? (
             <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <p className="flex items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  Usa tu correo real y tu número de teléfono real al finalizar la compra; enviaremos confirmaciones del pedido por correo y Telegram.
+                </p>
+              </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
+                <label className="block text-sm font-medium mb-1">Correo electrónico</label>
                 <Input type="email" {...loginForm.register("email")} />
                 {loginForm.formState.errors.email && <p className="text-xs text-destructive mt-1">{loginForm.formState.errors.email.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Password</label>
+                <label className="block text-sm font-medium mb-1">Contraseña</label>
                 <Input type="password" {...loginForm.register("password")} />
                 {loginForm.formState.errors.password && <p className="text-xs text-destructive mt-1">{loginForm.formState.errors.password.message}</p>}
               </div>
               <Button type="submit" disabled={isLoggingIn} className="w-full bg-accent hover:bg-accent/90 text-primary font-bold mt-6">
-                {isLoggingIn ? "Signing in..." : "Sign In"}
+                {isLoggingIn ? "Iniciando sesión..." : "Iniciar sesión"}
               </Button>
             </form>
           ) : (
             <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <p className="flex items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  Registra un correo real. También usa un número real al finalizar la compra para recibir confirmaciones del pedido por correo y Telegram.
+                </p>
+              </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Full Name</label>
+                <label className="block text-sm font-medium mb-1">Nombre completo</label>
                 <Input {...registerForm.register("name")} />
                 {registerForm.formState.errors.name && <p className="text-xs text-destructive mt-1">{registerForm.formState.errors.name.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
+                <label className="block text-sm font-medium mb-1">Correo electrónico</label>
                 <Input type="email" {...registerForm.register("email")} />
                 {registerForm.formState.errors.email && <p className="text-xs text-destructive mt-1">{registerForm.formState.errors.email.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Password</label>
+                <label className="block text-sm font-medium mb-1">Contraseña</label>
                 <Input type="password" {...registerForm.register("password")} />
                 {registerForm.formState.errors.password && <p className="text-xs text-destructive mt-1">{registerForm.formState.errors.password.message}</p>}
               </div>
               <Button type="submit" disabled={isRegistering} className="w-full bg-accent hover:bg-accent/90 text-primary font-bold mt-6">
-                {isRegistering ? "Creating account..." : "Create Account"}
+                {isRegistering ? "Creando cuenta..." : "Crear cuenta"}
               </Button>
             </form>
           )}

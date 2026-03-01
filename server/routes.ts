@@ -5,12 +5,22 @@ import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import connectPgSimple from "connect-pg-simple";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { type User } from "@shared/schema";
+import { sendOrderNotifications } from "./notifications";
+import { getTelegramBotUsername, getTelegramConnectUrlForUser, syncTelegramConnectionsFromUpdates } from "./telegram";
+import { pool } from "./db";
 
 const MemoryStore = createMemoryStore(session);
+const PgSessionStore = connectPgSimple(session);
+const ADMIN_EMAIL = "laptopstorecuba@gmail.com";
 
-// Type augmentation for session cart and passport (if used, but here we just store userId)
+function sanitizeUser(user: User) {
+  const { password, telegramLinkToken, ...safeUser } = user;
+  return safeUser;
+}
+
 declare module "express-session" {
   interface SessionData {
     userId?: number;
@@ -18,7 +28,6 @@ declare module "express-session" {
   }
 }
 
-// Password hashing helpers
 function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = scryptSync(password, salt, 64);
@@ -32,7 +41,6 @@ function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-// Middleware to ensure auth
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "No autorizado" });
@@ -44,8 +52,6 @@ function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "No autorizado" });
   }
-  // Let's assume we fetch user to check role, or store role in session.
-  // For simplicity, we fetch it
   storage.getUser(req.session.userId).then(user => {
     if (user?.role !== "admin") {
       return res.status(403).json({ message: "Requiere rol de administrador" });
@@ -58,19 +64,49 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
-  // Set up session
+  const isProduction = process.env.NODE_ENV === "production";
+  const sessionSecret = process.env.SESSION_SECRET?.trim();
+
+  if (isProduction && !sessionSecret) {
+    throw new Error("SESSION_SECRET must be set in production");
+  }
+
+  if (isProduction) {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        sid varchar NOT NULL PRIMARY KEY,
+        sess json NOT NULL,
+        expire timestamp(6) NOT NULL
+      );
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_user_sessions_expire"
+      ON user_sessions (expire);
+    `);
+  }
+
+  const sessionStore = isProduction
+    ? new PgSessionStore({
+        pool,
+        tableName: "user_sessions",
+      })
+    : new MemoryStore({
+        checkPeriod: 86400000,
+      });
+
   app.use(session({
-    secret: process.env.SESSION_SECRET || "laptop_store_secret_dev",
+    secret: sessionSecret || "laptop_store_secret_dev",
     resave: false,
     saveUninitialized: false,
-    store: new MemoryStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
-    }),
-    cookie: { secure: process.env.NODE_ENV === "production" }
+    store: sessionStore,
+    cookie: {
+      secure: isProduction,
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+    },
   }));
 
-  // Initialize cart in session
   app.use((req, res, next) => {
     if (!req.session.cart) {
       req.session.cart = [];
@@ -78,7 +114,6 @@ export async function registerRoutes(
     next();
   });
 
-  // === AUTH ROUTES ===
   app.post(api.auth.register.path, async (req, res) => {
     try {
       const input = api.auth.register.input.parse(req.body);
@@ -89,9 +124,8 @@ export async function registerRoutes(
       const hashedPassword = hashPassword(input.password);
       const user = await storage.createUser({ ...input, password: hashedPassword });
       req.session.userId = user.id;
-      
-      const { password, ...userWithoutPassword } = user;
-      res.status(201).json(userWithoutPassword);
+
+      res.status(201).json(sanitizeUser(user));
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
@@ -108,9 +142,8 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Credenciales inválidas" });
       }
       req.session.userId = user.id;
-      
-      const { password, ...userWithoutPassword } = user;
-      res.status(200).json(userWithoutPassword);
+
+      res.status(200).json(sanitizeUser(user));
     } catch (err) {
       res.status(401).json({ message: "Credenciales inválidas" });
     }
@@ -130,11 +163,33 @@ export async function registerRoutes(
     if (!user) {
       return res.status(401).json({ message: "Usuario no encontrado" });
     }
-    const { password, ...userWithoutPassword } = user;
-    res.status(200).json(userWithoutPassword);
+    res.status(200).json(sanitizeUser(user));
   });
 
-  // === PRODUCTS ROUTES ===
+  app.get(api.telegram.status.path, requireAuth, async (req, res) => {
+    try {
+      await syncTelegramConnectionsFromUpdates();
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+
+      const connected = Boolean(user.telegramChatId);
+      const connectUrl = connected
+        ? null
+        : await getTelegramConnectUrlForUser(user.id, user.telegramLinkToken);
+
+      res.status(200).json({
+        connected,
+        connectUrl,
+        botUsername: getTelegramBotUsername(),
+      });
+    } catch (error) {
+      console.error("[telegram] status error:", error);
+      res.status(500).json({ message: "No se pudo obtener el estado de Telegram" });
+    }
+  });
+
   app.get(api.products.list.path, async (req, res) => {
     const products = await storage.getProducts(req.query as any);
     res.status(200).json(products);
@@ -144,9 +199,8 @@ export async function registerRoutes(
     const product = await storage.getProductBySlug(req.params.slug);
     if (!product) return res.status(404).json({ message: "Producto no encontrado" });
     
-    // Fetch reviews too
     const reviews = await storage.getReviews(product.id);
-    res.status(200).json({ ...product, reviewsList: reviews });
+    res.status(200).json({ ...product, reviews });
   });
 
   app.post(api.products.create.path, requireAdmin, async (req, res) => {
@@ -175,7 +229,6 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
-  // === REVIEWS ROUTES ===
   app.get(api.reviews.list.path, async (req, res) => {
     const reviews = await storage.getReviews(Number(req.params.id));
     res.status(200).json(reviews);
@@ -191,7 +244,6 @@ export async function registerRoutes(
     }
   });
 
-  // === CART ROUTES (SESSION BASED) ===
   app.get(api.cart.get.path, (req, res) => {
     res.status(200).json(req.session.cart);
   });
@@ -227,7 +279,6 @@ export async function registerRoutes(
     res.status(200).json(req.session.cart);
   });
 
-  // === WISHLIST ROUTES ===
   app.get(api.wishlist.list.path, requireAuth, async (req, res) => {
     const products = await storage.getWishlist(req.session.userId!);
     res.status(200).json(products);
@@ -248,7 +299,6 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
-  // === ORDERS ROUTES ===
   app.get(api.orders.listMy.path, requireAuth, async (req, res) => {
     const orders = await storage.getOrdersByUser(req.session.userId!);
     res.status(200).json(orders);
@@ -263,7 +313,38 @@ export async function registerRoutes(
     try {
       const input = api.orders.create.input.parse(req.body);
       const order = await storage.createOrder(req.session.userId!, input);
-      // Empty the cart
+      await syncTelegramConnectionsFromUpdates();
+
+      const orderUser = await storage.getUser(req.session.userId!);
+      const uniqueProductIds = [...new Set(input.items.map((item) => item.productId))];
+      const productRecords = await Promise.all(uniqueProductIds.map((productId) => storage.getProduct(productId)));
+      const productsById = new Map(
+        uniqueProductIds.map((productId, index) => [productId, productRecords[index]]),
+      );
+      const notificationItems = input.items.map((item) => {
+        const product = productsById.get(item.productId);
+        return {
+          productId: item.productId,
+          name: product?.name ?? `Producto #${item.productId}`,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          description: product?.description ?? "",
+        };
+      });
+
+      void sendOrderNotifications({
+        orderId: order.id,
+        total: order.total,
+        customerName: orderUser?.name ?? input.address.fullName,
+        customerEmail: orderUser?.email ?? "",
+        customerPhone: input.address.phone,
+        customerTelegramChatId: orderUser?.telegramChatId ?? undefined,
+        items: notificationItems,
+        address: input.address,
+      }).catch((notificationError) => {
+        console.error("[notifications] order notifications failed:", notificationError);
+      });
+
       req.session.cart = [];
       res.status(201).json(order);
     } catch (err) {
@@ -283,10 +364,9 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
-  // === USERS ROUTES ===
   app.get(api.users.list.path, requireAdmin, async (req, res) => {
     const users = await storage.getAllUsers();
-    res.status(200).json(users.map(({ password, ...u }) => u));
+    res.status(200).json(users.map(sanitizeUser));
   });
 
   app.put(api.users.update.path, requireAdmin, async (req, res) => {
@@ -294,8 +374,7 @@ export async function registerRoutes(
       const input = api.users.update.input.parse(req.body);
       const updated = await storage.updateUser(Number(req.params.id), input);
       if (!updated) return res.status(404).json({ message: "Usuario no encontrado" });
-      const { password, ...userWithoutPassword } = updated;
-      res.status(200).json(userWithoutPassword);
+      res.status(200).json(sanitizeUser(updated));
     } catch (err) {
       res.status(400).json({ message: "Datos inválidos" });
     }
@@ -306,56 +385,54 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
-  // === ADMIN ROUTES ===
   app.get(api.admin.stats.path, requireAdmin, async (req, res) => {
     const stats = await storage.getStats();
     res.status(200).json(stats);
   });
 
-  // Data seeding
-  app.post("/api/seed", async (req, res) => {
-    // Basic seed script endpoint just in case it's needed
-    const count = await storage.getProducts();
-    if (count.length === 0) {
-      await storage.createProduct({
-        name: "ProBook X1",
-        slug: "probook-x1",
-        description: "Excelente laptop para profesionales con procesador i7 y 16GB de RAM.",
-        price: "1299.99",
-        stock: 50,
-        images: ["https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=60"],
-        specs: { processor: "Intel Core i7", ram: "16GB", storage: "512GB SSD" },
-        category: "Ultrabook",
-        brand: "HP",
-        badges: ["Envío gratis"]
-      });
-      await storage.createProduct({
-        name: "Gaming Beast V",
-        slug: "gaming-beast-v",
-        description: "Laptop para juegos extremos con RTX 4080 y pantalla 240Hz.",
-        price: "2499.99",
-        stock: 15,
-        images: ["https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=800&auto=format&fit=crop&q=60"],
-        specs: { processor: "AMD Ryzen 9", ram: "32GB", storage: "1TB NVMe" },
-        category: "Gaming",
-        brand: "Asus",
-        badges: ["Más vendido"]
-      });
-    }
-    
-    // Seed admin user
-    const admin = await storage.getUserByEmail("admin@test.com");
-    if (!admin) {
-      await storage.createUser({
-        email: "admin@test.com",
-        password: hashPassword("password123"),
-        name: "Admin User",
-        role: "admin"
-      });
-    }
+  if (!isProduction) {
+    app.post("/api/seed", requireAdmin, async (_req, res) => {
+      const count = await storage.getProducts();
+      if (count.length === 0) {
+        await storage.createProduct({
+          name: "ProBook X1",
+          slug: "probook-x1",
+          description: "Excelente laptop para profesionales con procesador i7 y 16GB de RAM.",
+          price: "1299.99",
+          stock: 50,
+          images: ["https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=60"],
+          specs: { processor: "Intel Core i7", ram: "16GB", storage: "512GB SSD" },
+          category: "Ultrabook",
+          brand: "HP",
+          badges: ["Envío gratis"]
+        });
+        await storage.createProduct({
+          name: "Gaming Beast V",
+          slug: "gaming-beast-v",
+          description: "Laptop para juegos extremos con RTX 4080 y pantalla 240Hz.",
+          price: "2499.99",
+          stock: 15,
+          images: ["https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=800&auto=format&fit=crop&q=60"],
+          specs: { processor: "AMD Ryzen 9", ram: "32GB", storage: "1TB NVMe" },
+          category: "Gaming",
+          brand: "Asus",
+          badges: ["Más vendido"]
+        });
+      }
 
-    res.status(200).json({ message: "Seed completado" });
-  });
+      const admin = await storage.getUserByEmail(ADMIN_EMAIL);
+      if (!admin) {
+        await storage.createUser({
+          email: ADMIN_EMAIL,
+          password: hashPassword("password123"),
+          name: "Admin User",
+          role: "admin"
+        });
+      }
+
+      res.status(200).json({ message: "Seed completado" });
+    });
+  }
 
   return httpServer;
 }

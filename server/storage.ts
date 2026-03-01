@@ -9,12 +9,10 @@ import {
 } from "@shared/schema";
 
 export interface IStorage {
-  // Auth
   getUser(id: number): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: RegisterRequest): Promise<User>;
 
-  // Products
   getProducts(params?: ProductsQueryParams): Promise<Product[]>;
   getProduct(id: number): Promise<Product | undefined>;
   getProductBySlug(slug: string): Promise<Product | undefined>;
@@ -22,33 +20,39 @@ export interface IStorage {
   updateProduct(id: number, product: UpdateProductRequest): Promise<Product | undefined>;
   deleteProduct(id: number): Promise<void>;
 
-  // Reviews
   getReviews(productId: number): Promise<(Review & { user: User })[]>;
   createReview(userId: number, productId: number, review: CreateReviewRequest): Promise<Review>;
 
-  // Orders
   getOrdersByUser(userId: number): Promise<Order[]>;
   getAllOrders(): Promise<Order[]>;
   deleteOrder(id: number): Promise<void>;
   createOrder(userId: number, order: CreateOrderRequest): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order | undefined>;
 
-  // Users Management
   getAllUsers(): Promise<User[]>;
   updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
   deleteUser(id: number): Promise<void>;
 
-  // Wishlist
   getWishlist(userId: number): Promise<Product[]>;
   addToWishlist(userId: number, productId: number): Promise<void>;
   removeFromWishlist(userId: number, productId: number): Promise<void>;
 
-  // Admin
   getStats(): Promise<{ totalUsers: number; totalProducts: number; totalOrders: number; totalRevenue: string }>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // Auth
+  private normalizeStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.filter((item): item is string => typeof item === "string");
+  }
+
+  private normalizeSpecs(value: unknown): Record<string, string> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return Object.fromEntries(
+      Object.entries(value).filter(([, item]) => typeof item === "string")
+    );
+  }
+
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -64,7 +68,6 @@ export class DatabaseStorage implements IStorage {
     return newUser;
   }
 
-  // Products
   async getProducts(params?: ProductsQueryParams): Promise<Product[]> {
     let query = db.select().from(products).$dynamic();
     
@@ -104,13 +107,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createProduct(product: CreateProductRequest): Promise<Product> {
-    const [newProduct] = await db.insert(products).values(product).returning();
+    const payload: typeof products.$inferInsert = {
+      ...product,
+      images: this.normalizeStringArray(product.images),
+      specs: this.normalizeSpecs(product.specs),
+      badges: this.normalizeStringArray(product.badges),
+    };
+
+    const [newProduct] = await db.insert(products).values(payload).returning();
     return newProduct;
   }
 
   async updateProduct(id: number, updates: UpdateProductRequest): Promise<Product | undefined> {
+    const payload: Partial<typeof products.$inferInsert> = { updatedAt: new Date() };
+
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.brand !== undefined) payload.brand = updates.brand;
+    if (updates.slug !== undefined) payload.slug = updates.slug;
+    if (updates.price !== undefined) payload.price = updates.price;
+    if (updates.category !== undefined) payload.category = updates.category;
+    if (updates.stock !== undefined) payload.stock = updates.stock;
+
+    if ("images" in updates) {
+      payload.images = this.normalizeStringArray(updates.images);
+    }
+    if ("specs" in updates) {
+      payload.specs = this.normalizeSpecs(updates.specs);
+    }
+    if ("badges" in updates) {
+      payload.badges = this.normalizeStringArray(updates.badges);
+    }
+
     const [updatedProduct] = await db.update(products)
-      .set({ ...updates, updatedAt: new Date() })
+      .set(payload)
       .where(eq(products.id, id))
       .returning();
     return updatedProduct;
@@ -120,7 +150,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(products).where(eq(products.id, id));
   }
 
-  // Reviews
   async getReviews(productId: number): Promise<(Review & { user: User })[]> {
     return await db.query.reviews.findMany({
       where: eq(reviews.productId, productId),
@@ -139,7 +168,6 @@ export class DatabaseStorage implements IStorage {
       comment: review.comment
     }).returning();
 
-    // Update average rating
     const allReviews = await db.select({ rating: reviews.rating }).from(reviews).where(eq(reviews.productId, productId));
     const avg = allReviews.reduce((acc, curr) => acc + curr.rating, 0) / allReviews.length;
     await db.update(products)
@@ -149,7 +177,6 @@ export class DatabaseStorage implements IStorage {
     return newReview;
   }
 
-  // Orders
   async getOrdersByUser(userId: number): Promise<Order[]> {
     return await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
   }
@@ -194,7 +221,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  // Wishlist
   async getWishlist(userId: number): Promise<Product[]> {
     const userWishlists = await db.query.wishlists.findMany({
       where: eq(wishlists.userId, userId),
@@ -204,7 +230,6 @@ export class DatabaseStorage implements IStorage {
     
     const productIds = userWishlists.map(w => w.productId);
     
-    // Fallback if no products
     let result: Product[] = [];
     for (const pid of productIds) {
        const [prod] = await db.select().from(products).where(eq(products.id, pid));
@@ -221,7 +246,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(wishlists).where(and(eq(wishlists.userId, userId), eq(wishlists.productId, productId)));
   }
 
-  // Admin Stats
   async getStats(): Promise<{ totalUsers: number; totalProducts: number; totalOrders: number; totalRevenue: string }> {
     const allUsers = await db.select().from(users);
     const allProducts = await db.select().from(products);

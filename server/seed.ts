@@ -2,6 +2,9 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { products, users, reviews } from "@shared/schema";
 import { randomBytes, scryptSync } from "crypto";
+import "dotenv/config";
+
+const ADMIN_EMAIL = "laptopstorecuba@gmail.com";
 
 function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -12,16 +15,14 @@ function hashPassword(password: string) {
 async function seed() {
   console.log("Seeding database...");
 
-  // Create admin user
   const adminPassword = hashPassword("password123");
   const [admin] = await db.insert(users).values({
-    email: "admin@test.com",
+    email: ADMIN_EMAIL,
     name: "Admin User",
     password: adminPassword,
     role: "admin",
   }).onConflictDoNothing().returning();
 
-  // Create normal user
   const userPassword = hashPassword("password123");
   const [normalUser] = await db.insert(users).values({
     email: "user@test.com",
@@ -30,11 +31,10 @@ async function seed() {
     role: "user",
   }).onConflictDoNothing().returning();
 
-  // Check if products exist
   const existingProducts = await db.select().from(products);
   if (existingProducts.length === 0) {
     console.log("Inserting sample products...");
-    const sampleProducts = [
+    const sampleProducts: Array<typeof products.$inferInsert> = [
       {
         name: "ProBook X1 Professional",
         slug: "probook-x1-professional",
@@ -87,7 +87,6 @@ async function seed() {
 
     const insertedProducts = await db.insert(products).values(sampleProducts).returning();
 
-    // Create some reviews if users exist
     if (normalUser && insertedProducts.length > 0) {
       await db.insert(reviews).values({
         userId: normalUser.id,
@@ -96,7 +95,6 @@ async function seed() {
         comment: "¡Excelente laptop! Muy rápida y ligera. Totalmente recomendada.",
       });
       
-      // Update the product's average rating
       await db.update(products).set({ averageRating: "5.00", numReviews: 1 }).where(eq(products.id, insertedProducts[0].id));
     }
   }

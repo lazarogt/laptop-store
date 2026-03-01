@@ -29,10 +29,10 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     setWishlist((prev) => {
       const exists = prev.find((item) => item.id === product.id);
       if (exists) {
-        toast({ title: "Removed from Wishlist", description: `${product.name} removed.` });
+        toast({ title: "Eliminado de favoritos", description: `${product.name} fue eliminado.` });
         return prev.filter((item) => item.id !== product.id);
       } else {
-        toast({ title: "Added to Wishlist", description: `${product.name} saved for later.` });
+        toast({ title: "Añadido a favoritos", description: `${product.name} se guardó para después.` });
         return [...prev, product];
       }
     });
@@ -51,6 +51,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
 
 export function useWishlist() {
   const context = useContext(WishlistContext);
-  if (!context) throw new Error("useWishlist must be used within WishlistProvider");
+  if (!context) throw new Error("useWishlist debe usarse dentro de WishlistProvider");
   return context;
 }

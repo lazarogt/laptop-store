@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,90 +6,50 @@
 
 @layer base {
   :root {
-    --font-sans: 'Inter', sans-serif;
-    --font-display: 'Outfit', sans-serif;
-
-    /* Amazon-like Color Palette */
-    --background: 210 20% 98%; /* Light gray background #F3F4F6 */
-    --foreground: 222 47% 11%;
-    
-    /* Primary: Dark Blue (Header) #131921 */
-    --primary: 214 27% 10%;
+    --font-sans: "Manrope", sans-serif;
+    --font-display: "Sora", sans-serif;
+    --background: 240 12% 97%;
+    --foreground: 222 33% 14%;
+    --primary: 222 47% 11%;
     --primary-foreground: 0 0% 100%;
-    
-    /* Secondary: Slightly lighter dark blue #232F3E */
-    --secondary: 213 28% 19%;
-    --secondary-foreground: 0 0% 100%;
-    
-    /* Accent: Amazon Yellow/Orange #FEBD69 */
-    --accent: 34 99% 70%;
-    --accent-foreground: 214 27% 10%;
-
-    /* Action/Buy Buttons #F0C14B / #FFA41C */
-    --action: 36 100% 55%;
-    --action-foreground: 214 27% 10%;
-    
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --ring: 36 100% 55%;
-    
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 215 28% 17%;
     --secondary-foreground: 210 40% 98%;
-    --accent: 34 99% 70%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --destructive: 0 62.8% 30.6%;
+    --accent: 221 83% 53%;
+    --accent-foreground: 0 0% 100%;
+    --muted: 220 15% 95%;
+    --muted-foreground: 215 16% 43%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --destructive: 0 76% 57%;
     --destructive-foreground: 210 40% 98%;
-    --ring: 34 99% 70%;
+    --ring: 221 83% 53%;
+    --radius: 1rem;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    background-image:
+      radial-gradient(1200px circle at 0% 0%, rgba(255, 255, 255, 0.8), transparent 40%),
+      radial-gradient(900px circle at 100% 0%, rgba(226, 232, 240, 0.5), transparent 35%);
   }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
-  }
-}
 
-.hover-elevate {
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.hover-elevate:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
 }
 
 .line-clamp-2 {

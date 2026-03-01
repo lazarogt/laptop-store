@@ -2,12 +2,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { Order, CreateOrderRequest } from "@shared/schema";
 
-export function useMyOrders() {
+export function useMyOrders(enabled = true) {
   return useQuery<Order[]>({
     queryKey: [api.orders.listMy.path],
+    enabled,
     queryFn: async () => {
       const res = await fetch(api.orders.listMy.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch orders");
+      if (!res.ok) throw new Error("No se pudieron cargar los pedidos");
       return res.json();
     },
   });
@@ -18,7 +19,7 @@ export function useAllOrders() {
     queryKey: [api.orders.listAll.path],
     queryFn: async () => {
       const res = await fetch(api.orders.listAll.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch all orders");
+      if (!res.ok) throw new Error("No se pudieron cargar todos los pedidos");
       return res.json();
     },
   });
@@ -34,7 +35,7 @@ export function useCreateOrder() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to create order");
+      if (!res.ok) throw new Error("No se pudo crear el pedido");
       return res.json();
     },
     onSuccess: () => {
@@ -54,7 +55,7 @@ export function useUpdateOrderStatus() {
         body: JSON.stringify({ status }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to update status");
+      if (!res.ok) throw new Error("No se pudo actualizar el estado");
       return res.json();
     },
     onSuccess: () => {
@@ -68,7 +69,7 @@ export function useAdminStats() {
     queryKey: [api.admin.stats.path],
     queryFn: async () => {
       const res = await fetch(api.admin.stats.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch admin stats");
+      if (!res.ok) throw new Error("No se pudieron cargar las estadísticas");
       return res.json();
     },
   });

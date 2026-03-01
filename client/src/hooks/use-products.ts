@@ -10,7 +10,7 @@ export function useProducts(params?: Record<string, string>) {
     queryKey: [api.products.list.path, params],
     queryFn: async () => {
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch products");
+      if (!res.ok) throw new Error("No se pudieron cargar los productos");
       return res.json();
     },
   });
@@ -23,7 +23,7 @@ export function useProduct(slug: string) {
       const url = buildUrl(api.products.get.path, { slug });
       const res = await fetch(url);
       if (res.status === 404) return null;
-      if (!res.ok) throw new Error("Failed to fetch product");
+      if (!res.ok) throw new Error("No se pudo cargar el producto");
       return res.json();
     },
     enabled: !!slug,
@@ -41,7 +41,7 @@ export function useCreateReview(productId: number) {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to submit review");
+      if (!res.ok) throw new Error("No se pudo enviar la reseña");
       return res.json();
     },
     onSuccess: () => {
@@ -60,10 +60,13 @@ export function useCreateProduct() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to create product");
+      if (!res.ok) throw new Error("No se pudo crear el producto");
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.products.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.products.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.admin.stats.path] });
+    },
   });
 }
 
@@ -78,12 +81,13 @@ export function useUpdateProduct() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to update product");
+      if (!res.ok) throw new Error("No se pudo actualizar el producto");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.products.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.products.get.path] });
+      queryClient.invalidateQueries({ queryKey: [api.admin.stats.path] });
     },
   });
 }

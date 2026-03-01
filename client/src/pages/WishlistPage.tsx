@@ -15,16 +15,16 @@ export default function WishlistPage() {
       
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <h1 className="text-3xl font-display font-bold mb-8 flex items-center gap-3">
-          Your Wishlist <Heart className="w-6 h-6 text-red-500 fill-current" />
+          Mis favoritos <Heart className="w-6 h-6 text-red-500 fill-current" />
         </h1>
 
         {wishlist.length === 0 ? (
           <div className="text-center py-24 bg-card rounded-2xl border border-border shadow-sm">
             <Heart className="w-20 h-20 text-muted-foreground/30 mx-auto mb-6" />
-            <h2 className="text-2xl font-bold mb-4">Your wishlist is empty</h2>
-            <p className="text-muted-foreground mb-8">Save items you like here and buy them later.</p>
+            <h2 className="text-2xl font-bold mb-4">Tu lista de favoritos está vacía</h2>
+            <p className="text-muted-foreground mb-8">Guarda aquí los productos que te gusten para comprarlos después.</p>
             <Button asChild size="lg" className="bg-primary text-white px-8">
-              <Link href="/">Discover Laptops</Link>
+              <Link href="/">Descubrir laptops</Link>
             </Button>
           </div>
         ) : (
