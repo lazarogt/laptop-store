@@ -1,47 +1,58 @@
-# Railway Deployment Guide
+# Railway Deployment Guide (Monorepo Root)
+
+This project is deployed from the repository root (`/`) with:
+- Build command: `npm run build:railway`
+- Start command: `npm run start`
 
 ## 1) Create and link project
 
-1. Open Railway and click **New Project**.
-2. Select **Deploy from GitHub**.
-3. Choose repository: `laptop-store`.
+1. Create a new Railway project.
+2. Connect this GitHub repository.
+3. Keep **Root Directory** as `/` (repo root).
 
-## 2) Configure service
+## 2) Commands (if Railway asks explicitly)
 
-In the Railway service settings:
-- **Root Directory** = `server`
-- **Start Command** = `npm run start:server`
+- **Install Command**: `npm ci`
+- **Build Command**: `npm run build:railway`
+- **Start Command**: `npm run start`
 
-## 3) Add database
-
-1. Add a **PostgreSQL** plugin/service in Railway.
-2. Copy the generated connection string and set it in your app service as `DATABASE_URL`.
-
-## 4) Set environment variables
-
-Use placeholders like these:
+## 3) Required environment variables
 
 ```env
+NODE_ENV=production
+PORT=8080
 DATABASE_URL=postgres://user:pass@host:5432/laptopdb
 SESSION_SECRET=replace-with-a-long-random-secret
-NODE_ENV=production
-CLIENT_URL=https://<your-netlify-site>.netlify.app
-PORT=5000
+CLIENT_URL=https://<your-frontend-domain>
 ```
 
-## 5) Run schema migrations
+Notes:
+- Railway injects `PORT` automatically. Keep app reading `process.env.PORT`.
+- `SESSION_SECRET` is mandatory in production.
 
-Use the option that matches your project setup:
+## 4) Database setup
 
-- Prisma:
-  - `npx prisma migrate deploy`
-- Drizzle:
-  - `npx drizzle-kit push`
+1. Add PostgreSQL service/plugin in Railway.
+2. Copy the generated connection URL to `DATABASE_URL`.
+3. Run schema push/migrations:
+   - Drizzle: `npx drizzle-kit push`
 
-## 6) Seed initial data
-
-Run:
+## 5) Deploy from CLI
 
 ```bash
-npx tsx server/seed.ts
+railway login
+railway link
+railway up
 ```
+
+Or deploy latest linked service:
+
+```bash
+railway deploy
+```
+
+## 6) Verify
+
+1. Check logs: `railway logs --tail`.
+2. Open the public Railway URL.
+3. Confirm API routes and SPA routes work (backend serves `dist/public`).

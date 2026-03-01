@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db } from "./db.js";
 import { eq, or, and, ilike, gte, lte, desc, asc } from "drizzle-orm";
 import { 
   users, products, reviews, orders, wishlists,
@@ -6,7 +6,7 @@ import {
   type CreateProductRequest, type UpdateProductRequest,
   type CreateReviewRequest, type CreateOrderRequest,
   type ProductsQueryParams, type RegisterRequest
-} from "@shared/schema";
+} from "../shared/schema.js";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;

@@ -1,6 +1,6 @@
-import { db } from "./db";
+import { db } from "./db.js";
 import { eq } from "drizzle-orm";
-import { products, users, reviews } from "@shared/schema";
+import { products, users, reviews } from "../shared/schema.js";
 import { randomBytes, scryptSync } from "crypto";
 import "dotenv/config";
 

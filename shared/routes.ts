@@ -4,7 +4,7 @@ import {
   loginSchema, createReviewReqSchema,
   createOrderReqSchema, addWishlistReqSchema,
   cartItemSchema
-} from './schema';
+} from './schema.js';
 
 export const errorSchemas = {
   validation: z.object({

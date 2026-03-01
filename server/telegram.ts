@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
-import { db } from "./db";
-import { users } from "@shared/schema";
+import { db } from "./db.js";
+import { users } from "../shared/schema.js";
 
 type TelegramUpdate = {
   update_id: number;

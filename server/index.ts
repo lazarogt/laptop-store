@@ -2,8 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
+import { registerRoutes } from "./routes.js";
+import { serveStatic } from "./static.js";
 import { createServer } from "http";
 
 const app = express();
@@ -51,7 +51,7 @@ app.options("/*", cors());
 
 app.use(
   express.json({
-    verify: (req, _res, buf) => {
+    verify: (req: Request, _res: Response, buf: Buffer) => {
       (req as Request & { rawBody?: unknown }).rawBody = buf;
     },
     limit: "5mb",
@@ -117,7 +117,7 @@ app.use((req, res, next) => {
   if (NODE_ENV === "production") {
     serveStatic(app);
   } else {
-    const { setupVite } = await import("./vite");
+    const { setupVite } = await import("./vite.js");
     await setupVite(httpServer, app);
   }
 

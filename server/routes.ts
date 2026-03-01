@@ -1,16 +1,20 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { type Server } from "http";
-import { storage } from "./storage";
-import { api, errorSchemas } from "@shared/routes";
+import { storage } from "./storage.js";
+import { api, errorSchemas } from "../shared/routes.js";
 import { z } from "zod";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import connectPgSimple from "connect-pg-simple";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
-import { type User } from "@shared/schema";
-import { sendOrderNotifications } from "./notifications";
-import { getTelegramBotUsername, getTelegramConnectUrlForUser, syncTelegramConnectionsFromUpdates } from "./telegram";
-import { pool } from "./db";
+import { type User } from "../shared/schema.js";
+import { sendOrderNotifications } from "./notifications.js";
+import {
+  getTelegramBotUsername,
+  getTelegramConnectUrlForUser,
+  syncTelegramConnectionsFromUpdates,
+} from "./telegram.js";
+import { pool } from "./db.js";
 
 const MemoryStore = createMemoryStore(session);
 const PgSessionStore = connectPgSimple(session);
