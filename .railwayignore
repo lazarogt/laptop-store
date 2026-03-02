@@ -1,14 +1,5 @@
 node_modules
+client/node_modules
 dist
-.git
-.github
-.config
-.local
-.env
-.env.*
-!.env.example
+build
 *.log
-DEPLOY.md
-DEPLOY_RAILWAY.md
-server/README_DEPLOY_RAILWAY.md
-netlify.toml

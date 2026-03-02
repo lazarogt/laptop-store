@@ -1,58 +1,30 @@
-# Railway Deployment Guide (Monorepo Root)
+# Deploy en Railway (Monorepo Root)
 
-This project is deployed from the repository root (`/`) with:
-- Build command: `npm run build:railway`
-- Start command: `npm run start`
+Usa la raíz del repositorio (`/`) como **Root Directory**.
 
-## 1) Create and link project
+## Comandos
 
-1. Create a new Railway project.
-2. Connect this GitHub repository.
-3. Keep **Root Directory** as `/` (repo root).
+- Install: `npm ci`
+- Build: `npm run build:railway`
+- Start: `npm run start`
 
-## 2) Commands (if Railway asks explicitly)
-
-- **Install Command**: `npm ci`
-- **Build Command**: `npm run build:railway`
-- **Start Command**: `npm run start`
-
-## 3) Required environment variables
+## Variables mínimas
 
 ```env
 NODE_ENV=production
-PORT=8080
 DATABASE_URL=postgres://user:pass@host:5432/laptopdb
 SESSION_SECRET=replace-with-a-long-random-secret
-CLIENT_URL=https://<your-frontend-domain>
+CLIENT_URL=https://tu-frontend.com
 ```
 
-Notes:
-- Railway injects `PORT` automatically. Keep app reading `process.env.PORT`.
-- `SESSION_SECRET` is mandatory in production.
+## Flujo recomendado
 
-## 4) Database setup
+1. Crea el proyecto en Railway y conecta el repo.
+2. Configura los comandos de Install/Build/Start anteriores.
+3. Agrega las variables mínimas.
+4. Ejecuta el deploy.
+5. Verifica logs y health del servidor.
 
-1. Add PostgreSQL service/plugin in Railway.
-2. Copy the generated connection URL to `DATABASE_URL`.
-3. Run schema push/migrations:
-   - Drizzle: `npx drizzle-kit push`
+## Nota de build
 
-## 5) Deploy from CLI
-
-```bash
-railway login
-railway link
-railway up
-```
-
-Or deploy latest linked service:
-
-```bash
-railway deploy
-```
-
-## 6) Verify
-
-1. Check logs: `railway logs --tail`.
-2. Open the public Railway URL.
-3. Confirm API routes and SPA routes work (backend serves `dist/public`).
+`build:railway` compila frontend + backend y luego ejecuta `npm prune --omit=dev` para dejar solo dependencias de producción en la imagen final.

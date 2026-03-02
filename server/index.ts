@@ -10,7 +10,7 @@ const app = express();
 const httpServer = createServer(app);
 
 const PORT = parseInt(process.env.PORT ?? "5000", 10);
-const CLIENT_URL = process.env.CLIENT_URL ?? "http://localhost:5173";
+const CLIENT_URL = process.env.CLIENT_URL ?? "";
 const NODE_ENV = process.env.NODE_ENV ?? "development";
 const TRUST_PROXY = process.env.TRUST_PROXY ?? (NODE_ENV === "production" ? "1" : "0");
 const LOG_API_RESPONSE_BODIES = NODE_ENV !== "production" && process.env.LOG_API_RESPONSE_BODIES === "true";
@@ -30,24 +30,27 @@ if (TRUST_PROXY === "1" || TRUST_PROXY.toLowerCase() === "true") {
   app.set("trust proxy", 1);
 }
 
-const allowed = process.env.CLIENT_URL ?? "http://localhost:5173";
+const allowedOrigins = (process.env.CLIENT_URL ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (NODE_ENV === "production" && allowedOrigins.length === 0) {
+  throw new Error("CLIENT_URL must be set in production");
+}
+
 app.use(
   cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      if (
-        origin === allowed ||
-        origin.endsWith(".netlify.app") ||
-        origin.endsWith(".railway.app")
-      ) {
-        return cb(null, true);
-      }
+      if (allowedOrigins.includes(origin)) return cb(null, true);
       return cb(new Error("Not allowed by CORS"));
     },
     credentials: true,
   }),
 );
-app.options("/*", cors());
+
+app.options("/{*corsPreflight}", cors());
 
 app.use(
   express.json({

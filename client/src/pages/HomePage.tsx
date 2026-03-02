@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { ArrowRight, ShieldCheck, Truck, Sparkles, Zap } from "lucide-react";
-import { useProducts } from "@/hooks/use-products.ts";
-import { Layout } from "@/components/premium/Layout.tsx";
-import { ProductGrid } from "@/components/premium/ProductGrid.tsx";
-import { PremiumBadge } from "@/components/premium/Badge.tsx";
+import { useProducts } from "@/hooks/use-products";
+import { Layout } from "@/components/premium/Layout";
+import { ProductGrid } from "@/components/premium/ProductGrid";
+import { PremiumBadge } from "@/components/premium/Badge";
 
 const featureItems = [
   {
