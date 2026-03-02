@@ -1,10 +1,9 @@
 [build]
-base = "."
+base = "client"
 command = "npm ci && npm run build"
 publish = "client/dist"
 
 [[redirects]]
 from = "/*"
-to = "https://laptop-store.up.railway.app/api:spalt"
+to = "index.html"
 status = 200
-force = true
