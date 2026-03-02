@@ -1,10 +1,10 @@
 [build]
-  base = "client"
-  command = "npm ci && npm run build"
-  publish = "dist"
+base = *client*
+command = "npm ci && npm run build"
+publish = "dist"
 
 [[redirects]]
-  from = "/api/*"
-  to = "https://REPLACE_WITH_RAILWAY_URL/api/:splat"
-  status = 200
-  force = true
+from = "/api/*"
+to = "https://laptop-store.up.railway.app/api:spalt"
+status = 200
+force = true
