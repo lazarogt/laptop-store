@@ -1,0 +1,61 @@
+import 'dotenv/config';
+import { existsSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import path from 'node:path';
+
+/**
+ * Restores a PostgreSQL dump using psql and environment-based credentials.
+ * Usage: npm run restore -- /absolute/or/relative/path/to/backup.sql
+ */
+const run = async (): Promise<void> => {
+  const sqlPath = process.argv[2];
+
+  if (!sqlPath) {
+    throw new Error('Usage: npm run restore -- <path-to-backup.sql>');
+  }
+
+  const resolvedPath = path.resolve(sqlPath);
+
+  if (!existsSync(resolvedPath)) {
+    throw new Error(`SQL file not found: ${resolvedPath}`);
+  }
+
+  const host = process.env.DB_HOST;
+  const user = process.env.DB_USER;
+  const password = process.env.DB_PASSWORD;
+  const dbName = process.env.DB_NAME;
+  const port = process.env.DB_PORT ?? '5432';
+
+  if (!host || !user || !dbName) {
+    throw new Error('Missing DB_HOST, DB_USER or DB_NAME in environment.');
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(
+      'psql',
+      ['--host', host, '--port', port, '--username', user, '--dbname', dbName, '--file', resolvedPath],
+      {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          ...(password ? { PGPASSWORD: password } : {}),
+        },
+      },
+    );
+
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(new Error(`psql exited with code ${code ?? 'unknown'}`));
+    });
+  });
+};
+
+run().catch((error) => {
+  console.error('[restoreBackup] failed:', error instanceof Error ? error.message : error);
+  process.exit(1);
+});

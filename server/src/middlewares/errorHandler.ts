@@ -5,6 +5,9 @@ import { logSecurityEvent } from '../utils/securityLogger.js';
 
 interface PgLikeError {
   code?: string;
+  type?: string;
+  status?: number;
+  statusCode?: number;
 }
 
 /** Normalizes unhandled errors into a consistent API response shape. */
@@ -25,7 +28,8 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       details: err.flatten(),
     };
   } else {
-    const code = (err as PgLikeError)?.code;
+    const external = err as PgLikeError;
+    const code = external?.code;
 
     if (code === '23505') {
       status = 409;
@@ -33,6 +37,9 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     } else if (code === '23503' || code === '22P02' || code === '23502') {
       status = 400;
       payload = { message: 'Invalid request data' };
+    } else if (external?.type === 'entity.too.large' || external?.status === 413 || external?.statusCode === 413) {
+      status = 413;
+      payload = { message: 'Payload too large. Maximum allowed request size is 100kb.' };
     }
   }
 
@@ -50,6 +57,20 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
 
   if (process.env.NODE_ENV !== 'production') {
     console.error('[errorHandler]', err);
+  }
+
+  if (
+    req.path.startsWith('/api/auth') ||
+    req.path.startsWith('/api/products') ||
+    req.path.startsWith('/api/orders') ||
+    req.path.startsWith('/api/users') ||
+    req.path.startsWith('/api/admin') ||
+    req.path.startsWith('/api/telegram')
+  ) {
+    res.status(status).json({
+      message: typeof payload.message === 'string' ? payload.message : 'Internal server error',
+    });
+    return;
   }
 
   res.status(status).json({

@@ -1,0 +1,276 @@
+# REPORT Codex Run - backend setup (`laptop-store`)
+
+## 1) Resumen ejecutivo
+Se generó un backend nuevo y modular en `server/src` con TypeScript + Node.js/Express + PostgreSQL para el recurso `laptops`, incluyendo capa de datos (CRUD SQL parametrizado), capa de servicio, controladores, rutas, middlewares reutilizables, validación con Zod, tests e2e con Jest/supertest, script de restauración SQL y actualización de scripts npm.
+
+Objetivo cubierto:
+- API base: `http://localhost:8000/api`
+- Endpoint principal: `http://localhost:8000/api/laptops`
+- CORS: permite `http://localhost:5173` por defecto y además orígenes en `CLIENT_URL`.
+- Configuración de DB por variables: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_NAME_TEST`, `DB_MAX`, `DB_IDLE_TIMEOUT`.
+
+## 2) Archivos creados y modificados
+
+### Creados
+- `server/src/db.ts`: pool `pg`, `query<T>()`, `getClient()`, retry simple en errores transitorios, logs mínimos en desarrollo y `pool.on('error')`.
+- `server/src/models/laptop.model.ts`: interfaz `Laptop`, CRUD completo, filtros/paginación, mapeo JSONB `<->` objeto JS, normalización de tipos, `ensureLaptopsTable()`.
+- `server/src/services/laptop.service.ts`: reglas de negocio (`price >= 0`, `title` no vacío) y orquestación model/controller.
+- `server/src/controllers/laptop.controller.ts`: handlers async para create/get/update/delete/list.
+- `server/src/routes/laptop.routes.ts`: router Express para `/api/laptops` con validación y async wrapper.
+- `server/src/middlewares/asyncHandler.ts`: wrapper de handlers async.
+- `server/src/middlewares/validateMiddleware.ts`: middleware reutilizable compatible con Zod (`body`, `params`, `query`).
+- `server/src/middlewares/errorHandler.ts`: normaliza errores a `{ success:false, error }`.
+- `server/src/middlewares/notFoundHandler.ts`: manejo de rutas no encontradas.
+- `server/src/middlewares/requestLogger.ts`: log mínimo en dev (método, ruta, status, tiempo).
+- `server/src/validation/laptop.schema.ts`: `createLaptopSchema`, `updateLaptopSchema`, y schemas auxiliares de params/query.
+- `server/src/utils/httpError.ts`: clase de error HTTP tipada.
+- `server/src/app.ts`: armado de app Express (json, cors, logger, rutas, handlers globales).
+- `server/src/index.ts`: arranque del servidor (`PORT || 8000`) sin bind en tests (`NODE_ENV=test`).
+- `server/tests/laptops.e2e.test.ts`: pruebas CRUD e2e con supertest.
+- `scripts/restoreBackup.ts`: restauración segura de SQL via `psql`.
+- `jest.config.cjs`: configuración Jest + ts-jest para ESM/TypeScript.
+- `tsconfig.test.json`: tsconfig para entorno de pruebas.
+- `REPORT_Codex_RUN.md`: este informe.
+
+### Modificados
+- `.env.example`: recreado y actualizado con variables backend/client (`VITE_API_URL`) y DB de test (`DB_NAME_TEST`).
+- `package.json`: scripts `dev:server`, `start`, `test`, `restore`; devDependencies para testing.
+- `package-lock.json`: actualización por instalación de dependencias nuevas.
+
+### Backups creados antes de sobrescritura
+- `package.json.bak`
+- `package-lock.json.bak`
+
+## 3) Snippets clave (<=120 líneas combinadas)
+
+### `server/src/db.ts`
+```ts
+const config = {
+  host: process.env.DB_HOST ?? parsedUrl?.hostname,
+  port: parseInteger(process.env.DB_PORT ?? parsedUrl?.port, 5432),
+  user: process.env.DB_USER ?? parsedUrl?.username,
+  password: process.env.DB_PASSWORD ?? parsedUrl?.password,
+  database:
+    (isTest ? process.env.DB_NAME_TEST : undefined) ??
+    process.env.DB_NAME ??
+    parsedUrl?.pathname.replace(/^\//, ''),
+  max: parseInteger(process.env.DB_MAX, 10),
+  idleTimeoutMillis: parseInteger(process.env.DB_IDLE_TIMEOUT, 30_000),
+  connectionTimeoutMillis: 5_000,
+  allowExitOnIdle: isTest,
+};
+
+export const query = async <T extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params: unknown[] = [],
+): Promise<QueryResult<T>> => {
+  for (let attempt = 0; attempt <= 1; attempt += 1) {
+    try {
+      return await pool.query<T>(text, params);
+    } catch (error) {
+      if (attempt === 0 && isRetryable(error)) {
+        await delay(150);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error('Database query failed after retry.');
+};
+```
+
+### `server/src/models/laptop.model.ts`
+```ts
+export const createLaptop = async (data: LaptopInput): Promise<Laptop> => {
+  const title = normalizeText(data.title, 'title');
+  const brand = normalizeText(data.brand, 'brand');
+  const price = normalizePrice(data.price);
+  const specs = normalizeSpecs(data.specs);
+
+  const result = await query<LaptopRow>(
+    `
+      INSERT INTO laptops (title, brand, price, specs)
+      VALUES ($1, $2, $3, $4::jsonb)
+      RETURNING id, title, brand, price, specs, created_at;
+    `,
+    [title, brand, price, JSON.stringify(specs)],
+  );
+
+  return toLaptop(result.rows[0]);
+};
+
+export const listLaptops = async (
+  filter: LaptopFilter = {},
+  pagination: PaginationOptions = {},
+): Promise<{ rows: Laptop[]; total: number }> => {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  // ... filtros brand/search/minPrice/maxPrice
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const [rowsResult, countResult] = await Promise.all([
+    query<LaptopRow>(`SELECT ... FROM laptops ${whereClause} ORDER BY created_at DESC LIMIT $1 OFFSET $2`, [20, 0]),
+    query<CountRow>(`SELECT COUNT(*)::int AS total FROM laptops ${whereClause}`, params),
+  ]);
+
+  return { rows: rowsResult.rows.map(toLaptop), total: Number(countResult.rows[0]?.total ?? 0) };
+};
+```
+
+### `server/src/index.ts`
+```ts
+export const startServer = async (port = Number(process.env.PORT ?? 8000)): Promise<Server> => {
+  await ensureLaptopsTable();
+  const app = createApp();
+  const server = app.listen(port, () => {
+    console.log(`[server] listening on http://localhost:${port}`);
+  });
+  return server;
+};
+
+const isEntryPoint = (): boolean => {
+  const currentFile = fileURLToPath(import.meta.url);
+  const entryFile = process.argv[1] ? path.resolve(process.argv[1]) : '';
+  return currentFile === entryFile;
+};
+
+if (isEntryPoint() && process.env.NODE_ENV !== 'test') {
+  startServer().catch((error) => {
+    console.error('[server] failed to start:', error);
+    process.exit(1);
+  });
+}
+```
+
+## 4) Comandos exactos para reproducir localmente
+```bash
+git clone https://github.com/<org-o-user>/laptop-store.git
+cd laptop-store
+npm install
+cp .env.example .env
+# editar .env con credenciales reales de PostgreSQL
+createdb laptop_store && createdb laptop_store_test
+npm run restore -- ./backups/laptop_store.sql
+npm run dev
+npm test
+```
+
+Notas de entorno:
+- API base recomendada para cliente: `http://localhost:8000/api`
+- `client/.env` recomendado:
+  - `VITE_API_URL=http://localhost:8000/api`
+
+## 5) Resultados de tests
+Estrategia implementada:
+- Base separada para pruebas usando `DB_NAME_TEST` (seleccionada en `server/src/db.ts` cuando `NODE_ENV=test`).
+- Limpieza por prueba con `TRUNCATE TABLE laptops RESTART IDENTITY` (aislamiento entre casos).
+
+Ejecución realizada:
+```bash
+DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres DB_NAME=laptop_store DB_NAME_TEST=laptop_store_test npm test
+```
+
+Resultado observado en este entorno:
+- Jest y supertest ejecutan correctamente el suite.
+- Fallo por autenticación de PostgreSQL:
+  - `error: password authentication failed for user "postgres"`
+- Causa probable: credenciales/roles locales no coinciden con `DB_USER`/`DB_PASSWORD` usados en la ejecución.
+
+Sample output esperado cuando la DB está correcta:
+```text
+PASS server/tests/laptops.e2e.test.ts
+  Laptops API e2e
+    ✓ creates a laptop
+    ✓ gets laptop by id
+    ✓ updates laptop fields
+    ✓ lists laptops with filters and pagination
+    ✓ deletes a laptop
+```
+
+## 6) Riesgos y advertencias
+- Se creó un backend nuevo en `server/src`; el backend legado en `server/*.ts` no se eliminó.
+- `package-lock.json` cambió de forma amplia por instalación de nuevas dependencias (Jest/ts-jest/supertest).
+- Si `.env` tiene `DATABASE_URL` inválida, el sistema ahora la ignora y exige variables `DB_*` válidas.
+- No se generaron migraciones formales; se usa `CREATE TABLE IF NOT EXISTS laptops` en runtime.
+
+Sugerencias de índices para `laptops`:
+```sql
+CREATE INDEX IF NOT EXISTS idx_laptops_brand ON laptops (brand);
+CREATE INDEX IF NOT EXISTS idx_laptops_price ON laptops (price);
+CREATE INDEX IF NOT EXISTS idx_laptops_title_fts ON laptops USING GIN (to_tsvector('simple', title));
+```
+
+## 7) TODOs y mejoras recomendadas
+- Migraciones versionadas (Drizzle/Knex/Flyway) en vez de `ensureLaptopsTable()` runtime.
+- Roles de DB (`app_user`, `app_readonly`) y rotación de secretos.
+- Autenticación/autorización para rutas sensibles.
+- CI con jobs de `check`, `build`, `test` usando servicio PostgreSQL.
+- Tests de errores (validación, 404, SQL edge-cases) y cobertura.
+- Docker compose de desarrollo (Postgres + pgAdmin) si se desea entorno reproducible instantáneo.
+
+## 8) Diff resumido y estado git
+Resumen (`git diff --stat`):
+- `.env.example`: actualización de variables.
+- `package.json`: scripts y dependencias de test.
+- `package-lock.json`: sincronización de dependencias.
+- Nuevos módulos en `server/src`, tests en `server/tests`, helper `scripts/restoreBackup.ts`, configs Jest/tsconfig test.
+
+Estado de rama/commit:
+- Rama local creada: `codex/backend-setup`.
+- `git commit` **no pudo completarse** por configuración faltante de identidad:
+  - `Author identity unknown`
+  - faltan `git config user.name` y `git config user.email`.
+
+Comandos para completar commit y push:
+```bash
+git config --local user.name "Tu Nombre"
+git config --local user.email "tu-email@dominio.com"
+git commit -m "chore: codex generated backend setup (db, models, controllers, routes, tests)"
+git push -u origin codex/backend-setup
+```
+
+## 9) Quick Start (6 comandos)
+```bash
+npm install
+cp .env.example .env
+createdb laptop_store
+createdb laptop_store_test
+npm run dev
+npm test
+```
+
+## 10) Metadata JSON
+```json
+{
+  "generated_at": "2026-03-07T18:30:07+00:00",
+  "files_created": [
+    "jest.config.cjs",
+    "tsconfig.test.json",
+    "scripts/restoreBackup.ts",
+    "server/src/app.ts",
+    "server/src/controllers/laptop.controller.ts",
+    "server/src/db.ts",
+    "server/src/index.ts",
+    "server/src/middlewares/asyncHandler.ts",
+    "server/src/middlewares/errorHandler.ts",
+    "server/src/middlewares/notFoundHandler.ts",
+    "server/src/middlewares/requestLogger.ts",
+    "server/src/middlewares/validateMiddleware.ts",
+    "server/src/models/laptop.model.ts",
+    "server/src/routes/laptop.routes.ts",
+    "server/src/services/laptop.service.ts",
+    "server/src/utils/httpError.ts",
+    "server/src/validation/laptop.schema.ts",
+    "server/tests/laptops.e2e.test.ts",
+    "package.json.bak",
+    "package-lock.json.bak",
+    "REPORT_Codex_RUN.md"
+  ],
+  "files_modified": [
+    ".env.example",
+    "package.json",
+    "package-lock.json"
+  ],
+  "branch": "codex/backend-setup"
+}
+```

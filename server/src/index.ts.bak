@@ -1,0 +1,47 @@
+import 'dotenv/config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Server } from 'node:http';
+import pool from './db.js';
+import { createApp } from './app.js';
+import { ensureLaptopsTable } from './models/laptop.model.js';
+
+/** Starts the HTTP server after checking DB/table readiness. */
+export const startServer = async (port = Number(process.env.PORT ?? 8000)): Promise<Server> => {
+  await ensureLaptopsTable();
+
+  const app = createApp();
+  const server = app.listen(port, () => {
+    console.log(`[server] listening on http://localhost:${port}`);
+  });
+
+  const shutdown = async (signal: string): Promise<void> => {
+    console.log(`[server] ${signal} received, closing resources...`);
+    server.close(async () => {
+      await pool.end();
+      process.exit(0);
+    });
+  };
+
+  process.once('SIGINT', () => {
+    void shutdown('SIGINT');
+  });
+  process.once('SIGTERM', () => {
+    void shutdown('SIGTERM');
+  });
+
+  return server;
+};
+
+const isEntryPoint = (): boolean => {
+  const currentFile = fileURLToPath(import.meta.url);
+  const entryFile = process.argv[1] ? path.resolve(process.argv[1]) : '';
+  return currentFile === entryFile;
+};
+
+if (isEntryPoint() && process.env.NODE_ENV !== 'test') {
+  startServer().catch((error) => {
+    console.error('[server] failed to start:', error);
+    process.exit(1);
+  });
+}
