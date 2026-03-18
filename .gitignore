@@ -1,0 +1,40 @@
+# Env
+.env
+server/src/.env
+.env.production
+.env.production.*
+!.env.example
+!.env.production.example
+
+# Logs y reportes
+logs/
+reports/
+coverage/
+*.log
+*.json.log
+*.status
+
+# Historial y temporales
+.aider*
+*.bak
+estructura.txt
+cookies.txt
+NODE_ENV=test
+.local/
+.replit
+
+# Builds
+dist/
+build/
+client/dist/
+
+# Dependencias
+node_modules/
+
+# Sistema
+.DS_Store
+Thumbs.dbuploads/
+.vscode/
+prompts/
+uploads/
+uploads/

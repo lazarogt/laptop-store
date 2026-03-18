@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "codex/**"]
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_DB: laptop_store
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: password123
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin -d laptop_store"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USER: admin
+      DB_PASSWORD: password123
+      DB_NAME: laptop_store
+      DB_NAME_TEST: laptopdb_test
+      NODE_ENV: test
+      SESSION_SECRET: ci-session-secret
+      JWT_SECRET: ci-jwt-secret
+      ADMIN_CHAT_ID: 1
+      CORS_ORIGIN: http://localhost:5000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install client dependencies
+        run: npm --prefix client ci
+
+      - name: Create test database
+        env:
+          PGPASSWORD: password123
+        run: |
+          psql -h 127.0.0.1 -U admin -d postgres -c "CREATE DATABASE laptopdb_test;" || true
+
+      - name: Lint / type-check
+        run: npm run lint
+
+      - name: Run backend tests
+        run: npm test -- --json --outputFile=reports/jest-results-prod-backend.json
+
+      - name: Run frontend Vitest
+        run: npm --prefix client run test
+
+      - name: Build frontend
+        env:
+          VITE_API_URL: /api
+        run: npm --prefix client run build
+
+      - name: Build frontend analyzer
+        env:
+          VITE_API_URL: /api
+        run: npm --prefix client run build:analyze
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-and-test-reports
+          path: |
+            reports
+            client/reports
+
+      # Optional deploy template:
+      # - name: Build and push Docker image
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     docker build -t your-registry/laptop-store:${{ github.sha }} .
+      #     docker push your-registry/laptop-store:${{ github.sha }}
